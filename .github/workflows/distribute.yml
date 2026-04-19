@@ -22,7 +22,7 @@ jobs:
           node-version: 18
 
       - name: Install dependencies (stable)
-        run: npm ci
+        run: ci --no-optional
 
       - name: Build app
         run: npm run build
