@@ -1,11 +1,11 @@
-name: Build and ReleaseuxeBill
+name: Build and Release LuxeBill
 
 on:
   release:
     types: [published]
 
 jobs:
-  release:
+  build:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -13,28 +13,25 @@ jobs:
         os: [macos-latest, windows-latest]
 
     steps:
-      - name: Check out git repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-config: '20'
-          cache: 'npm'
+          node-version: 18
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build React App
+      - name: Build app
         run: npm run build
 
-      - name: Build Electron App
-        run: npm run electron:build
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Package app
+        run: npx electron-builder
 
-      - name: Upload Artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: installers-${{ matrix.os }}
-          path: release/**/LuxeBill*.*
+          name: LuxeBill-${{ matrix.os }}
+          path: dist/**
