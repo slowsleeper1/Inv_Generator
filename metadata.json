@@ -1,0 +1,6 @@
+{
+  "name": "LuxeBill - Professional Accommodation Invoicing",
+  "description": "A high-end SaaS-style invoice generator for Airbnb hosts and property managers. Desktop-ready with PDF/PNG export and local persistence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
