@@ -21,15 +21,29 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies (stable)
-        run: ci --no-optional
+      # Fix npm optional dependency issues (Tailwind / native bindings)
+      - name: Fix npm optional dependencies
+        run: npm config set optional true
 
+      # Clean install (avoids corrupted installs in CI)
+      - name: Install dependencies (fixed)
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install --force
+
+      # Rebuild native modules (critical for Tailwind oxide)
+      - name: Rebuild native modules
+        run: npm rebuild
+
+      # Build your frontend (Vite)
       - name: Build app
         run: npm run build
 
+      # Package Electron app
       - name: Package app
         run: npx electron-builder
 
+      # Upload build artifacts
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
