@@ -1,11 +1,13 @@
 name: Build and Release LuxeBill
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+  workflow_dispatch: # Allow manual trigger
 
 jobs:
-  build:
+  release:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -13,37 +15,28 @@ jobs:
         os: [macos-latest, windows-latest]
 
     steps:
-      - name: Checkout repository
+      - name: Check out git repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: |
-          npm install --include=optional
-          npm rebuild
+        run: npm install
 
-      - name: Rebuild native modules
-        run: npm rebuild
-
-      - name: Build app (Vite)
+      - name: Build React App
         run: npm run build
 
-      - name: Package app (Electron)
+      - name: Build Electron App
+        run: npm run electron:release
         env:
-         USE_SYSTEM_APP_BUILDER: true
-        run: npx electron-builder
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifacts
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: LuxeBill-${{ matrix.os }}
-          path: |
-            dist/**
-            dist-electron/**
-            release/**
-            *.dmg
-            *.exe
+          name: installers-${{ matrix.os }}
+          path: release/**/LuxeBill*.*

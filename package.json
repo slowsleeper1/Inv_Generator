@@ -1,8 +1,7 @@
 {
   "name": "react-example",
   "private": true,
-  "version": "0.0.0",
-  
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -19,6 +18,7 @@
     "appId": "com.luxebill.app",
     "productName": "LuxeBill",
     "copyright": "Copyright © 2026 LuxeBill",
+    "asar": true,
     "directories": {
       "output": "release/${version}"
     },
@@ -32,13 +32,13 @@
       "target": [
         "dmg"
       ],
-      "icon": "public/icon.svg"
+      "icon": "public/icon.png"
     },
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "public/icon.svg"
+      "icon": "public/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
-   
+    "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -73,7 +73,7 @@
     "electron": "^41.2.1",
     "electron-builder": "^26.8.1",
     "electron-is-dev": "^3.0.1",
-    "tailwindcss": "3.4.0",
+    "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"

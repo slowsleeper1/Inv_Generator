@@ -1,13 +1,59 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Merriweather:wght@300;400;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* Google Font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+/* Enable .dark class selection for dark: utilities in Tailwind v4 */
+@variant dark (&:where(.dark, .dark *));
 
-/* Base styles */
-body {
-  @apply font-sans antialiased;
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Merriweather", serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --color-bg-window: #F3F4F6;
+  --color-bg-sidebar: #FFFFFF;
+  --color-bg-invoice: #FFFFFF;
+  --color-border-theme: #E5E7EB;
+  --color-text-main: #111827;
+  --color-text-muted: #6B7280;
+  --color-accent-theme: #2563EB;
+
+  /* Hex Overrides for html2canvas compatibility (Tailwind 4 uses oklch by default) */
+  --color-blue-50: #eff6ff;
+  --color-blue-400: #60a5fa;
+  --color-blue-600: #2563eb;
+  --color-blue-900: #1e3a8a;
+  
+  --color-green-50: #f0fdf4;
+  --color-green-400: #4ade80;
+  --color-green-600: #16a34a;
+  --color-green-900: #14532d;
+
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+}
+
+@layer base {
+  body {
+    @apply font-sans antialiased;
+  }
+
+  /* Specific variable overrides for dark mode */
+  .dark {
+    --color-bg-window: #0f0f0f;
+    --color-bg-sidebar: #1a1a1a;
+    --color-bg-invoice: #1a1a1a;
+    --color-border-theme: #262626;
+    --color-text-main: #f3f4f6;
+    --color-text-muted: #9ca3af;
+  }
 }
 
 /* Custom Scrollbar */
