@@ -41,3 +41,5 @@ jobs:
             dist/**
             dist-electron/**
             release/**
+            *.dmg
+            *.exe
