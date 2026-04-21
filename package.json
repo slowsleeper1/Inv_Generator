@@ -1,7 +1,7 @@
 {
   "name": "luxebill",
   "private": true,
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "A professional invoice generator for accommodation businesses",
   "author": "sw33tbeats@gmail.com",
   "type": "module",
@@ -27,7 +27,8 @@
       "repo": "Inv_Generator"
     },
     "directories": {
-      "output": "release/${version}"
+      "output": "release/${version}",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
@@ -39,13 +40,13 @@
       "target": [
         "dmg"
       ],
-      "icon": "public/icon.svg"
+      "icon": "build/icon.svg"
     },
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "public/icon.svg"
+      "icon": "build/icon.svg"
     },
     "nsis": {
       "oneClick": false,
