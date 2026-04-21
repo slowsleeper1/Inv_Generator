@@ -17,14 +17,11 @@ function createWindow() {
 
   const isDev = !app.isPackaged;
 
-  const url = isDev 
-    ? 'http://localhost:3000' 
-    : `file://${path.join(__dirname, '../dist/index.html')}`;
-
-  win.loadURL(url);
-
   if (isDev) {
+    win.loadURL('http://localhost:3000');
     win.webContents.openDevTools();
+  } else {
+    win.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 }
 
