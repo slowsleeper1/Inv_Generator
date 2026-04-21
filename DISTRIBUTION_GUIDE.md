@@ -9,7 +9,7 @@ I have configured a **Professional Build Pipeline** that automatically creates y
 1.  **Export to GitHub:**
     *   In the AI Studio toolbar, click **Settings** (gear icon).
     *   Select **Export to GitHub**.
-    *   Connect your account and create a new repository (e.g., `luxebill-app`).
+    *   Connect your account and create a new repository (e.g., `Inv_Generator`).
 
 2.  **Trigger the Build:**
     *   Once your repository is created, click the link to open it on GitHub.
