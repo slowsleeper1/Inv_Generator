@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
-import isDev from 'electron-is-dev';
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -15,6 +14,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+
+  const isDev = !app.isPackaged;
 
   const url = isDev 
     ? 'http://localhost:3000' 

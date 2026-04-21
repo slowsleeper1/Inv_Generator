@@ -15,7 +15,7 @@ I have configured a **Professional Build Pipeline** that automatically creates y
     *   Once your repository is created, click the link to open it on GitHub.
     *   Click the **"Releases"** section on the right sidebar (or go to `Actions` tab).
     *   Create a **New Release**.
-    *   For the "Tag version", type **`v1.0.19`**.
+    *   For the "Tag version", type **`v1.0.21`**.
     *   Click **Publish Release**.
 
 3.  **Download Your Apps:**
