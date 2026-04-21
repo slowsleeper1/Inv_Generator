@@ -1,7 +1,7 @@
 {
   "name": "luxebill",
   "private": true,
-  "version": "1.0.16",
+  "version": "1.0.18",
   "description": "A professional invoice generator for accommodation businesses",
   "author": "sw33tbeats@gmail.com",
   "type": "module",
@@ -21,6 +21,11 @@
     "productName": "LuxeBill",
     "copyright": "Copyright © 2026 LuxeBill",
     "asar": true,
+    "publish": {
+      "provider": "github",
+      "owner": "slowsleeper1",
+      "repo": "Inv_Generator"
+    },
     "directories": {
       "output": "release/${version}"
     },
