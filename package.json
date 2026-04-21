@@ -1,7 +1,7 @@
 {
   "name": "luxebill",
   "private": true,
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "A professional invoice generator for accommodation businesses",
   "author": "sw33tbeats@gmail.com",
   "type": "module",
@@ -11,11 +11,12 @@
     "preview": "vite preview",
     "clean": "rm -rf dist release",
     "lint": "tsc --noEmit",
+    "build:electron": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --format=esm --external:electron --outdir=electron --out-extension:.js=.js",
     "electron:dev": "concurrently \"npm run dev\" \"electron .\"",
-    "electron:build": "npm run build && electron-builder",
-    "electron:release": "npm run build && electron-builder --publish always"
+    "electron:build": "npm run build && npm run build:electron && electron-builder",
+    "electron:release": "npm run build && npm run build:electron && electron-builder --publish always"
   },
-  "main": "electron/main.ts",
+  "main": "electron/main.js",
   "build": {
     "appId": "com.luxebill.app",
     "productName": "LuxeBill",
@@ -80,6 +81,7 @@
     "concurrently": "^9.2.1",
     "electron": "^41.2.1",
     "electron-builder": "^26.8.1",
+    "esbuild": "^0.28.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
