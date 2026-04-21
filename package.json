@@ -1,7 +1,7 @@
 {
   "name": "luxebill",
   "private": true,
-  "version": "1.0.24",
+  "version": "1.0.25",
   "description": "A professional invoice generator for accommodation businesses",
   "author": "sw33tbeats@gmail.com",
   "type": "module",
