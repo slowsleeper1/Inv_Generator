@@ -5,6 +5,7 @@ import { format, addDays } from 'date-fns';
 
 interface InvoiceState {
   invoice: InvoiceData;
+  history: HistoryItem[];
   theme: Theme;
   font: InvoiceFont;
   fontSize: number;
@@ -23,7 +24,21 @@ interface InvoiceState {
   setFont: (font: InvoiceFont) => void;
   setFontSize: (size: number) => void;
   resetInvoice: () => void;
+  
+  saveToHistory: () => void;
+  deleteFromHistory: (invoiceNumber: string) => void;
+  loadFromHistory: (historyItem: HistoryItem) => void;
 }
+
+const calculateTotal = (data: InvoiceData) => {
+  const accommodationTotal = (data.accommodation.nightlyRate * data.accommodation.nights) + 
+                             data.accommodation.cleaningFee + 
+                             data.accommodation.serviceFee;
+  const lineItemsTotal = data.lineItems.reduce((acc, item) => acc + item.total, 0);
+  const subtotal = accommodationTotal + lineItemsTotal;
+  const tax = (subtotal * data.accommodation.taxRate) / 100;
+  return subtotal + tax - data.accommodation.discount;
+};
 
 const initialInvoice: InvoiceData = {
   invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
@@ -63,8 +78,9 @@ const initialInvoice: InvoiceData = {
 
 export const useInvoiceStore = create<InvoiceState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       invoice: initialInvoice,
+      history: [],
       theme: 'light',
       font: 'font-sans',
       fontSize: 14,
@@ -129,6 +145,34 @@ export const useInvoiceStore = create<InvoiceState>()(
           invoiceNumber: `INV-${Date.now().toString().slice(-6)}` 
         } 
       }),
+
+      saveToHistory: () => {
+        const { invoice, history } = get();
+        const historyItem: HistoryItem = {
+          ...invoice,
+          createdAt: new Date().toISOString(),
+          totalAmount: calculateTotal(invoice)
+        };
+        
+        // Remove existing if same invoice number
+        const newHistory = [
+          historyItem,
+          ...history.filter(item => item.invoiceNumber !== invoice.invoiceNumber)
+        ];
+        
+        set({ history: newHistory });
+      },
+
+      deleteFromHistory: (invoiceNumber) => {
+        set((state) => ({
+          history: state.history.filter(item => item.invoiceNumber !== invoiceNumber)
+        }));
+      },
+
+      loadFromHistory: (historyItem) => {
+        const { createdAt, totalAmount, ...invoice } = historyItem;
+        set({ invoice });
+      }
     }),
     {
       name: 'luxebill-storage',

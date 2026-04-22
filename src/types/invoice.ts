@@ -41,5 +41,10 @@ export interface InvoiceData {
   notes: string;
 }
 
+export interface HistoryItem extends InvoiceData {
+  createdAt: string;
+  totalAmount: number;
+}
+
 export type Theme = 'light' | 'dark';
 export type InvoiceFont = 'font-sans' | 'font-mono' | 'font-serif';

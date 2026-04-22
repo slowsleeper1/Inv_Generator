@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { InvoiceFont } from '../types/invoice';
 
 export default function InvoicePreview() {
-  const { invoice, theme, setTheme, font, setFont, fontSize } = useInvoiceStore();
+  const { invoice, theme, setTheme, font, setFont, fontSize, saveToHistory } = useInvoiceStore();
   const previewRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -77,6 +77,7 @@ export default function InvoicePreview() {
       });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
       pdf.save(`Invoice_${invoice.invoiceNumber}.pdf`);
+      saveToHistory();
       showSuccess();
     } catch (err) {
       console.error(err);
@@ -98,6 +99,7 @@ export default function InvoicePreview() {
       link.download = `Invoice_${invoice.invoiceNumber}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
+      saveToHistory();
       showSuccess();
     } catch (err) {
       console.error(err);

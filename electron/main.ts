@@ -5,9 +5,10 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 1000,
-    minHeight: 700,
+    minWidth: 800,
+    minHeight: 600,
     titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

@@ -28,20 +28,22 @@ export default function App() {
   return (
     <div className="flex flex-col h-[100dvh] overflow-hidden bg-bg-window dark:bg-[#121212] text-text-main dark:text-gray-100 transition-colors duration-300 font-sans">
       {/* DESKTOP APP TITLE BAR - Traffic Lights */}
-      <header className="h-[38px] min-h-[38px] flex items-center px-4 border-b border-border-theme dark:border-gray-800 bg-white dark:bg-[#1a1a1a] z-50 select-none">
-        <div className="hidden md:flex gap-2 mr-5">
-          <div className="w-3 h-3 rounded-full bg-[#FF5F57]" />
-          <div className="w-3 h-3 rounded-full bg-[#FEBC2E]" />
-          <div className="w-3 h-3 rounded-full bg-[#28C840]" />
-        </div>
+      <header 
+        style={{ WebkitAppRegion: 'drag' } as any}
+        className="h-[38px] min-h-[38px] flex items-center px-4 border-b border-border-theme dark:border-gray-800 bg-white dark:bg-[#1a1a1a] z-50 select-none"
+      >
+        <div className="hidden md:flex w-[68px] shrink-0" /> {/* Spacer for macOS Traffic Lights */}
         
-        <div className="flex-1 text-center truncate">
+        <div className="flex-1 text-center truncate pointer-events-none">
           <span className="text-[12px] md:text-[13px] font-semibold text-text-muted dark:text-gray-400">
             LuxeBill &mdash; {invoice.invoiceNumber}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div 
+          style={{ WebkitAppRegion: 'no-drag' } as any}
+          className="flex items-center gap-2"
+        >
           <button 
             onClick={resetInvoice}
             className="p-1.5 text-gray-400 hover:text-accent-theme transition-colors"
@@ -126,7 +128,7 @@ export default function App() {
       {/* STATUS BAR - Hidden on mobile */}
       <footer className="hidden md:flex h-7 px-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-[#1a1a1a] items-center justify-between text-[10px] font-medium text-gray-400 uppercase tracking-widest">
         <div className="flex items-center gap-4">
-          <span>v1.0.5 - Mobile Responsive</span>
+          <span>v1.0.28 - Persistence Mode</span>
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
             Adaptive Layer Active
