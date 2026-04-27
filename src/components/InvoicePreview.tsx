@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
-import { Download, FileText, Image as ImageIcon, CheckCircle2, Loader2, Send } from 'lucide-react';
+import { Download, FileText, Image as ImageIcon, CheckCircle2, Loader2, Send, Printer } from 'lucide-react';
 import { cn } from '../lib/utils';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -48,6 +48,28 @@ export default function InvoicePreview() {
     const fonts: InvoiceFont[] = ['font-sans', 'font-serif', 'font-mono'];
     const nextIndex = (fonts.indexOf(font) + 1) % fonts.length;
     setFont(fonts[nextIndex]);
+  };
+
+  const formatDateSafe = (dateStr: string | undefined, defaultDate: string) => {
+    try {
+      if (!dateStr) return format(new Date(defaultDate), 'MMM dd, yyyy');
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return format(new Date(defaultDate), 'MMM dd, yyyy');
+      return format(d, 'MMM dd, yyyy');
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  };
+
+  const formatDateShort = (dateStr: string | undefined, defaultDate: string) => {
+    try {
+      if (!dateStr) return format(new Date(defaultDate), 'MMM dd');
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return format(new Date(defaultDate), 'MMM dd');
+      return format(d, 'MMM dd');
+    } catch (e) {
+      return 'N/A';
+    }
   };
 
   const calculateSubtotal = () => {
@@ -113,6 +135,65 @@ export default function InvoicePreview() {
     setTimeout(() => setExportSuccess(false), 3000);
   };
 
+  const handlePrint = () => {
+    if (!previewRef.current) return;
+    
+    // Create a new window
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to print the invoice.');
+      return;
+    }
+
+    // Get the styles from the current document
+    const styles = Array.from(document.styleSheets)
+      .map(styleSheet => {
+        try {
+          return Array.from(styleSheet.cssRules)
+            .map(rule => rule.cssText)
+            .join('');
+        } catch (e) {
+          return '';
+        }
+      })
+      .join('');
+
+    // Construct the HTML for the print window
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice - ${invoice.invoiceNumber}</title>
+          <style>
+            ${styles}
+            @media print {
+              body { margin: 0; padding: 0; background: white !important; }
+              .print-container { width: 100% !important; height: auto !important; transform: none !important; margin: 0 !important; box-shadow: none !important; }
+            }
+          </style>
+        </head>
+        <body class="${theme === 'dark' ? 'dark bg-[#1a1a1a]' : 'bg-white'}">
+          <div class="print-container w-[595px] mx-auto py-8">
+            ${previewRef.current.outerHTML}
+          </div>
+          <script>
+            window.onload = () => {
+              setTimeout(() => {
+                window.print();
+                // Close the window after printing (optional)
+                // window.close();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#E5E7EB] dark:bg-[#0f0f0f] overflow-hidden">
       {/* TOOLBAR */}
@@ -134,6 +215,13 @@ export default function InvoicePreview() {
           </div>
           
           <div className="flex items-center gap-1.5 md:gap-2">
+            <button 
+              onClick={handlePrint}
+              className="px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-border-theme dark:border-gray-700 rounded-md text-[12px] md:text-[13px] font-semibold text-text-main dark:text-gray-200 hover:bg-gray-100 transition-colors shadow-sm flex items-center gap-2"
+            >
+              <Printer size={14} />
+              <span className="hidden sm:inline">Print</span>
+            </button>
             <button 
               onClick={exportPNG}
               disabled={isExporting}
@@ -184,26 +272,49 @@ export default function InvoicePreview() {
           <div 
             ref={previewRef}
             className={cn(
-              "w-[595px] h-[780px] bg-white dark:bg-[#1a1a1a] shadow-[0_10px_30px_rgba(0,0,0,0.1)] p-12 transition-all duration-300 flex flex-col",
-              font
+              "w-[595px] h-[780px] bg-white dark:bg-[#1a1a1a] shadow-[0_10px_30px_rgba(0,0,0,0.1)] p-12 transition-all duration-300 flex flex-col relative overflow-hidden",
+              font,
+              (invoice as any).status === 'cancelled' && "opacity-60 grayscale-[0.5] select-none"
             )}
             style={{ fontSize: `${fontSize}px` }}
           >
-            {/* Header */}
-            <div className="flex justify-between items-start mb-10">
-              {invoice.business.logo ? (
-                <img src={invoice.business.logo} alt="Logo" className="w-12 h-12 object-contain" />
-              ) : (
-                <div className="w-12 h-12 bg-accent-theme rounded-lg flex items-center justify-center text-white font-bold text-xl">
-                  {invoice.business.name.charAt(0)}
-                </div>
-              )}
-              
-              <div className="text-right">
-                <div className="text-2xl font-bold text-text-main dark:text-white uppercase leading-none mb-1">INVOICE</div>
-                <div className="text-[13px] text-text-muted mt-1 font-medium">#{invoice.invoiceNumber}</div>
-              </div>
+            {/* Watermark Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center rotate-[-25deg] pointer-events-none z-0">
+               {(invoice as any).status === 'paid' && (
+                  <div className="flex flex-col items-center opacity-[0.12] dark:opacity-[0.1]">
+                    <span className="text-[120px] font-black text-green-600 border-[12px] border-green-600 px-12 py-4 rounded-3xl uppercase tracking-tighter">PAID</span>
+                    <span className="text-2xl font-bold text-green-600 mt-2 uppercase tracking-widest">Confirmation</span>
+                  </div>
+                )}
+                {(invoice as any).status === 'cancelled' && (
+                  <div className="flex flex-col items-center opacity-[0.4] dark:opacity-[0.3]">
+                    <span className="text-[100px] font-black text-red-600 border-[12px] border-red-600 px-12 py-4 rounded-3xl uppercase tracking-tighter">CANCELLED</span>
+                    <span className="text-2xl font-bold text-red-600 mt-2 uppercase tracking-widest">Withdrawn</span>
+                  </div>
+                )}
             </div>
+
+            <div className="relative z-10 flex flex-col h-full">
+              {/* Header */}
+              <div className="flex justify-between items-start mb-10">
+                {invoice.business.logo ? (
+                  <img src={invoice.business.logo} alt="Logo" className="w-12 h-12 object-contain" />
+                ) : (
+                  <div className="w-12 h-12 bg-accent-theme rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                    {invoice.business.name.charAt(0)}
+                  </div>
+                )}
+                
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-text-main dark:text-white uppercase leading-none mb-1">INVOICE</div>
+                  <div className="text-[13px] text-text-muted mt-1 font-medium">#{invoice.invoiceNumber}</div>
+                  {invoice.accommodation.unitNumber && (
+                    <div className="mt-2 inline-block px-2 py-0.5 bg-text-main dark:bg-white text-white dark:text-gray-900 text-[10px] uppercase font-black tracking-widest rounded transition-all">
+                        Unit: {invoice.accommodation.unitNumber}
+                    </div>
+                  )}
+                </div>
+              </div>
 
             {/* Details Row */}
             <div className="flex justify-between mb-8 text-[13px]">
@@ -236,9 +347,11 @@ export default function InvoicePreview() {
               {/* Accommodation */}
               <div className="border-b border-border-theme dark:border-gray-800 py-3 flex items-start">
                 <div className="flex-[3]">
-                  <div className="font-bold text-text-main dark:text-gray-100 italic">Accommodation</div>
+                  <div className="font-bold text-text-main dark:text-gray-100 italic">
+                    Accommodation {invoice.accommodation.unitNumber && `— Unit ${invoice.accommodation.unitNumber}`}
+                  </div>
                   <div className="text-[11px] text-text-muted mt-0.5">
-                    {format(new Date(invoice.issueDate), 'MMM dd')} — {format(new Date(invoice.dueDate), 'MMM dd, yyyy')}
+                    {formatDateShort(invoice.accommodation.checkIn, invoice.issueDate)} — {formatDateSafe(invoice.accommodation.checkOut, invoice.dueDate)}
                   </div>
                 </div>
                 <div className="flex-1 text-center text-text-muted dark:text-gray-400">{invoice.accommodation.nights}</div>
@@ -307,5 +420,6 @@ export default function InvoicePreview() {
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }
