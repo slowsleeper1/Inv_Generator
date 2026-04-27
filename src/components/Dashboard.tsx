@@ -201,18 +201,18 @@ export default function Dashboard() {
                       {unit.unit_name || 'Unassigned'}
                     </span>
                     <span className="text-sm font-black text-gray-900 dark:text-gray-100">
-                      ${unit.revenue.toLocaleString()}
+                      ${(unit.revenue || 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="h-1.5 w-full bg-gray-50 dark:bg-gray-800 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-blue-500 rounded-full transition-all duration-1000 group-hover:bg-blue-400" 
-                      style={{ width: `${(unit.revenue / Math.max(...stats.unitRevenue.map(u => u.revenue)) * 100)}%` }}
+                      style={{ width: `${((unit.revenue || 0) / Math.max(1, ...stats.unitRevenue.map(u => u.revenue || 0)) * 100)}%` }}
                     />
                   </div>
                   <div className="flex items-center justify-between text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
-                    <span>{unit.booking_count} Bookings</span>
-                    <span>Potential: ${unit.potential_revenue?.toLocaleString()}</span>
+                    <span>{unit.booking_count || 0} Bookings</span>
+                    <span>Potential: ${(unit.potential_revenue || 0).toLocaleString()}</span>
                   </div>
                 </div>
               ))

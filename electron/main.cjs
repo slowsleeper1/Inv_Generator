@@ -307,7 +307,7 @@ var statsApi = {
     return db.prepare(`
       SELECT 
         strftime('%Y-%m', p.payment_date) as month,
-        SUM(p.amount) as revenue,
+        COALESCE(SUM(p.amount), 0) as revenue,
         COUNT(DISTINCT p.invoice_id) as invoice_count
       FROM payments p
       JOIN invoices i ON p.invoice_id = i.id
@@ -322,10 +322,10 @@ var statsApi = {
     return db.prepare(`
       SELECT 
         r.unit_name,
-        SUM(p.amount) as revenue,
-        SUM(
+        COALESCE(SUM(p.amount), 0) as revenue,
+        COALESCE(SUM(
           (MAX(0, (r.nightly_rate * MAX(1, CAST(julianday(r.check_out) - julianday(r.check_in) AS INTEGER)) + r.cleaning_fee + r.service_fee) - r.discount)) * (1 + r.tax_rate / 100)
-        ) as potential_revenue,
+        ), 0) as potential_revenue,
         COUNT(r.id) as booking_count
       FROM reservations r
       LEFT JOIN invoices i ON i.reservation_id = r.id
