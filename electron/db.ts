@@ -152,14 +152,17 @@ export const reservationsApi = {
   updatePaymentStatus: (id: number, status: string) => {
     db.prepare('UPDATE reservations SET payment_status = ? WHERE id = ?').run(status, id);
   },
-  delete: db.transaction((id: number) => {
-    const invoices: any = db.prepare('SELECT id FROM invoices WHERE reservation_id = ?').all(id);
-    for (const inv of invoices) {
-      db.prepare('DELETE FROM payments WHERE invoice_id = ?').run(inv.id);
-      db.prepare('DELETE FROM invoices WHERE id = ?').run(inv.id);
-    }
-    db.prepare('DELETE FROM reservations WHERE id = ?').run(id);
-  }),
+  delete: (id: number) => {
+    const tx = db.transaction((resId: number) => {
+      const invoices: any = db.prepare('SELECT id FROM invoices WHERE reservation_id = ?').all(resId);
+      for (const inv of invoices) {
+        db.prepare('DELETE FROM payments WHERE invoice_id = ?').run(inv.id);
+        db.prepare('DELETE FROM invoices WHERE id = ?').run(inv.id);
+      }
+      db.prepare('DELETE FROM reservations WHERE id = ?').run(resId);
+    });
+    tx(id);
+  },
   getById: (id: number) => {
     return db.prepare(`
       SELECT r.*, g.name as guest_name, g.email as guest_email, g.address as guest_address, g.phone as guest_phone
@@ -242,34 +245,37 @@ export const invoicesApi = {
 
 // PAYMENTS API
 export const paymentsApi = {
-  add: db.transaction((payment: any) => {
-    // 1. Check invoice and reservation status
-    const invoice: any = invoicesApi.getById(payment.invoice_id);
-    if (!invoice) throw new Error('Invoice not found');
+  add: (payment: any) => {
+    const tx = db.transaction((p: any) => {
+      // 1. Check invoice and reservation status
+      const invoice: any = invoicesApi.getById(p.invoice_id);
+      if (!invoice) throw new Error('Invoice not found');
 
-    const res = db.prepare('SELECT status FROM reservations WHERE id = ?').get(invoice.reservation_id) as any;
-    if (invoice.status === 'cancelled' || (res && res.status === 'cancelled')) {
-      throw new Error('Cannot add payment to a cancelled booking.');
-    }
+      const res = db.prepare('SELECT status FROM reservations WHERE id = ?').get(invoice.reservation_id) as any;
+      if (invoice.status === 'cancelled' || (res && res.status === 'cancelled')) {
+        throw new Error('Cannot add payment to a cancelled booking.');
+      }
 
-    const stmt = db.prepare('INSERT INTO payments (invoice_id, amount, payment_date, method, notes) VALUES (?, ?, ?, ?, ?)');
-    const info = stmt.run(payment.invoice_id, payment.amount, payment.payment_date, payment.method, payment.notes);
-    
-    // Auto-update invoice status
-    const payments: any = db.prepare('SELECT SUM(amount) as total FROM payments WHERE invoice_id = ?').get(payment.invoice_id);
-    const totalPaid = payments.total || 0;
-    
-    let newStatus = 'partially_paid';
-    if (totalPaid >= invoice.total_amount) {
-      newStatus = 'paid';
-    } else if (totalPaid === 0) {
-      newStatus = 'issued';
-    }
-    
-    invoicesApi.updateStatus(payment.invoice_id, newStatus);
-    
-    return info.lastInsertRowid;
-  }),
+      const stmt = db.prepare('INSERT INTO payments (invoice_id, amount, payment_date, method, notes) VALUES (?, ?, ?, ?, ?)');
+      const info = stmt.run(p.invoice_id, p.amount, p.payment_date, p.method, p.notes);
+      
+      // Auto-update invoice status
+      const payments: any = db.prepare('SELECT SUM(amount) as total FROM payments WHERE invoice_id = ?').get(p.invoice_id);
+      const totalPaid = payments.total || 0;
+      
+      let newStatus = 'partially_paid';
+      if (totalPaid >= invoice.total_amount) {
+        newStatus = 'paid';
+      } else if (totalPaid === 0) {
+        newStatus = 'issued';
+      }
+      
+      invoicesApi.updateStatus(p.invoice_id, newStatus);
+      
+      return info.lastInsertRowid;
+    });
+    return tx(payment);
+  },
   getByInvoiceId: (invoiceId: number) => {
     return db.prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY payment_date DESC').all(invoiceId);
   }
