@@ -95,12 +95,12 @@ const initialInvoice: InvoiceData = {
     phone: '+1 (555) 987-6543',
   },
   accommodation: {
-    nightlyRate: 150,
-    nights: 3,
-    cleaningFee: 75,
-    serviceFee: 45,
-    taxRate: 12,
-    discount: 50,
+    nightlyRate: 0,
+    nights: 1,
+    cleaningFee: 0,
+    serviceFee: 0,
+    taxRate: 0,
+    discount: 0,
   },
   lineItems: [
     {
@@ -775,8 +775,12 @@ export const useInvoiceStore = create<InvoiceState>()(
                 },
                 accommodation: {
                   ...state.invoice.accommodation,
-                  ...acc,
                   unitNumber: unit_name || '',
+                  nightlyRate: acc.nightly_rate,
+                  cleaningFee: acc.cleaning_fee,
+                  serviceFee: acc.service_fee,
+                  taxRate: acc.tax_rate,
+                  discount: acc.discount,
                   checkIn: check_in,
                   checkOut: check_out,
                   guestCount: res.guest_count,
