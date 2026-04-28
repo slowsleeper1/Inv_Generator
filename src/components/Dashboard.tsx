@@ -1,14 +1,18 @@
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { useInvoiceStore } from '../store/useInvoiceStore';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   AreaChart, Area, Cell, PieChart, Pie
 } from 'recharts';
-import { DollarSign, Users, Calendar, TrendingUp, AlertCircle, Home, PieChart as PieIcon, ArrowUpRight, Download, Printer } from 'lucide-react';
+import { DollarSign, Users, Calendar, TrendingUp, AlertCircle, Home, PieChart as PieIcon, ArrowUpRight, Download, Printer, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function Dashboard() {
   const { stats, fetchStats } = useInvoiceStore();
+  const dashboardRef = useRef<HTMLDivElement>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const handleDownloadCSV = () => {
     const summary = stats.summary;
@@ -36,8 +40,24 @@ export default function Dashboard() {
     window.URL.revokeObjectURL(url);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!dashboardRef.current) return;
+    try {
+      setIsPrinting(true);
+      const canvas = await html2canvas(dashboardRef.current, { scale: 2, useCORS: true, logging: false });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height] // Match element dimensions exactly
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`performance_stats_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   useEffect(() => {
@@ -52,7 +72,7 @@ export default function Dashboard() {
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   return (
-    <div className="space-y-10 max-w-6xl mx-auto">
+    <div ref={dashboardRef} className="space-y-10 max-w-6xl mx-auto p-4 bg-white dark:bg-[#0a0a0a] rounded-3xl">
       {/* Header Section */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -239,10 +259,11 @@ export default function Dashboard() {
             </button>
             <button 
               onClick={handlePrint}
-              className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 flex items-center gap-1.5 transition-colors"
+              disabled={isPrinting}
+              className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 flex items-center gap-1.5 transition-colors disabled:opacity-50"
             >
-              <Printer size={12} />
-              Print Report
+              {isPrinting ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />}
+              {isPrinting ? 'Preparing PDF...' : 'Print Report'}
             </button>
           </div>
         </div>

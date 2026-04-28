@@ -123,6 +123,11 @@ const calculateStatsFromState = (state: { history: HistoryItem[], guests: any[],
       .map(inv => inv.reservationId)
   );
 
+  const getMonth = (dateString: string) => dateString ? dateString.substring(0, 7) : new Date().toISOString().substring(0, 7);
+  const monthlyRevenueMap: Record<string, { revenue: number; invoice_count: number }> = {};
+  const unitRevenueMap: Record<string, { revenue: number; potential_revenue: number; booking_count: number }> = {};
+  const uniqueInvoicesPerMonth: Record<string, Set<number>> = {};
+
   const historyRevenue = state.history
     .filter(inv => {
       if (inv.status !== 'paid') return false;
@@ -134,7 +139,30 @@ const calculateStatsFromState = (state: { history: HistoryItem[], guests: any[],
       }
       return true;
     })
-    .reduce((sum, inv) => sum + inv.totalAmount, 0);
+    .reduce((sum, inv) => {
+      // Monthly
+      const invoiceDate = inv.issueDate || inv.createdAt || new Date().toISOString();
+      const month = getMonth(invoiceDate as string);
+      if (!monthlyRevenueMap[month]) {
+        monthlyRevenueMap[month] = { revenue: 0, invoice_count: 0 };
+        uniqueInvoicesPerMonth[month] = new Set();
+      }
+      monthlyRevenueMap[month].revenue += inv.totalAmount;
+      uniqueInvoicesPerMonth[month].add(inv.id as number);
+
+      // Unit
+      let unitName = inv.accommodation?.unitNumber || 'Unassigned';
+      if (inv.reservationId) {
+         const res = state.reservations.find(r => String(r.id) === String(inv.reservationId));
+         if (res && res.unit_name) unitName = res.unit_name;
+      }
+      if (!unitRevenueMap[unitName]) {
+        unitRevenueMap[unitName] = { revenue: 0, potential_revenue: 0, booking_count: 0 };
+      }
+      unitRevenueMap[unitName].revenue += inv.totalAmount;
+
+      return sum + inv.totalAmount;
+    }, 0);
 
   // Add revenue from paid reservations that aren't logged in history yet
   const unloggedPaidReservationRevenue = state.reservations
@@ -155,7 +183,25 @@ const calculateStatsFromState = (state: { history: HistoryItem[], guests: any[],
         lineItems: []
       };
       
-      return sum + calculateTotal(tempInvoice);
+      const potential = calculateTotal(tempInvoice);
+
+      // Unit
+      let unitName = r.unit_name || 'Unassigned';
+      if (!unitRevenueMap[unitName]) {
+        unitRevenueMap[unitName] = { revenue: 0, potential_revenue: 0, booking_count: 0 };
+      }
+      unitRevenueMap[unitName].revenue += potential;
+
+      // Monthly
+      const month = getMonth(r.check_in);
+      if (!monthlyRevenueMap[month]) {
+        monthlyRevenueMap[month] = { revenue: 0, invoice_count: 0 };
+        uniqueInvoicesPerMonth[month] = new Set();
+      }
+      monthlyRevenueMap[month].revenue += potential;
+      monthlyRevenueMap[month].invoice_count += 1; // Unlogged paid reservations count as 1 invoice implicitly
+
+      return sum + potential;
     }, 0);
 
   const totalRevenue = historyRevenue + unloggedPaidReservationRevenue;
@@ -202,6 +248,21 @@ const calculateStatsFromState = (state: { history: HistoryItem[], guests: any[],
   // Count confirmed reservations for active stays
   const activeReservations = state.reservations.filter(r => r.status === 'confirmed').length;
 
+  state.reservations.forEach(r => {
+    if (r.status === 'cancelled') return;
+    let unitName = r.unit_name || 'Unassigned';
+    if (!unitRevenueMap[unitName]) {
+      unitRevenueMap[unitName] = { revenue: 0, potential_revenue: 0, booking_count: 0 };
+    }
+    unitRevenueMap[unitName].booking_count += 1;
+    const nights = Math.max(1, Math.ceil((new Date(r.check_out).getTime() - new Date(r.check_in).getTime()) / (1000 * 3600 * 24)));
+    const tempInvoice: any = {
+      accommodation: { nightlyRate: r.nightly_rate, nights, cleaningFee: r.cleaning_fee, serviceFee: r.service_fee, taxRate: r.tax_rate, discount: r.discount },
+      lineItems: []
+    };
+    unitRevenueMap[unitName].potential_revenue += calculateTotal(tempInvoice);
+  });
+
   const cancelledReservations = state.reservations.filter(r => r.status === 'cancelled');
   const cancelledCount = cancelledReservations.length;
   const cancelledAmount = cancelledReservations.reduce((sum, r) => {
@@ -227,13 +288,37 @@ const calculateStatsFromState = (state: { history: HistoryItem[], guests: any[],
     return sum + calculateTotal(tempInvoice);
   }, 0);
 
+  Object.keys(uniqueInvoicesPerMonth).forEach(month => {
+     monthlyRevenueMap[month].invoice_count += uniqueInvoicesPerMonth[month].size;
+  });
+
+  const monthlyRevenue = Object.keys(monthlyRevenueMap)
+    .sort((a, b) => b.localeCompare(a))
+    .slice(0, 12)
+    .map(month => ({
+      month,
+      revenue: monthlyRevenueMap[month].revenue,
+      invoice_count: monthlyRevenueMap[month].invoice_count
+    }));
+
+  const unitRevenue = Object.keys(unitRevenueMap)
+    .map(unit_name => ({
+      unit_name,
+      ...unitRevenueMap[unit_name]
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+
   return {
-    totalRevenue,
-    unpaidInvoices: totalOutstanding,
-    guestCount,
-    activeReservations,
-    cancelledCount,
-    cancelledAmount
+    summary: {
+      totalRevenue,
+      unpaidInvoices: totalOutstanding,
+      guestCount,
+      activeReservations,
+      cancelledCount,
+      cancelledAmount
+    },
+    monthlyRevenue,
+    unitRevenue
   };
 };
 
@@ -401,10 +486,7 @@ export const useInvoiceStore = create<InvoiceState>()(
             const nextReservations = [newRes, ...state.reservations];
             return {
               reservations: nextReservations,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, reservations: nextReservations })
-              }
+              stats: calculateStatsFromState({ ...state, reservations: nextReservations })
             };
           });
         }
@@ -522,10 +604,7 @@ export const useInvoiceStore = create<InvoiceState>()(
             return {
               reservations: nextReservations,
               history: nextHistory,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, reservations: nextReservations, history: nextHistory })
-              }
+              stats: calculateStatsFromState({ ...state, reservations: nextReservations, history: nextHistory })
             };
           });
         }
@@ -553,10 +632,7 @@ export const useInvoiceStore = create<InvoiceState>()(
             return {
               reservations: nextReservations,
               history: nextHistory,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, reservations: nextReservations, history: nextHistory })
-              }
+              stats: calculateStatsFromState({ ...state, reservations: nextReservations, history: nextHistory })
             };
           });
         }
@@ -609,10 +685,7 @@ export const useInvoiceStore = create<InvoiceState>()(
             return {
               reservations: nextReservations,
               history: nextHistory,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, reservations: nextReservations, history: nextHistory })
-              }
+              stats: calculateStatsFromState({ ...state, reservations: nextReservations, history: nextHistory })
             };
           });
         }
@@ -661,10 +734,7 @@ export const useInvoiceStore = create<InvoiceState>()(
             return {
               reservations: nextReservations,
               history: nextHistory,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, reservations: nextReservations, history: nextHistory })
-              }
+              stats: calculateStatsFromState({ ...state, reservations: nextReservations, history: nextHistory })
             };
           });
         }
@@ -684,10 +754,7 @@ export const useInvoiceStore = create<InvoiceState>()(
             const nextGuests = [newGuest, ...state.guests];
             return {
               guests: nextGuests,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, guests: nextGuests })
-              }
+              stats: calculateStatsFromState({ ...state, guests: nextGuests })
             };
           });
           return newId;
@@ -705,10 +772,7 @@ export const useInvoiceStore = create<InvoiceState>()(
             const nextGuests = state.guests.map(g => g.id === id ? { ...guest, id } : g);
             return {
               guests: nextGuests,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, guests: nextGuests })
-              }
+              stats: calculateStatsFromState({ ...state, guests: nextGuests })
             };
           });
         }
@@ -738,10 +802,7 @@ export const useInvoiceStore = create<InvoiceState>()(
               guests: nextGuests,
               reservations: nextReservations,
               history: nextHistory,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, guests: nextGuests, reservations: nextReservations, history: nextHistory })
-              }
+              stats: calculateStatsFromState({ ...state, guests: nextGuests, reservations: nextReservations, history: nextHistory })
             };
           });
         }
@@ -876,10 +937,7 @@ export const useInvoiceStore = create<InvoiceState>()(
             const nextHistory = [newItem, ...otherHistory];
             return {
               history: nextHistory,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, history: nextHistory })
-              }
+              stats: calculateStatsFromState({ ...state, history: nextHistory })
             };
           });
           if (shouldReset) await get().resetInvoice();
@@ -939,10 +997,7 @@ export const useInvoiceStore = create<InvoiceState>()(
               history: nextHistory,
               invoice: updatedInvoice,
               reservations: nextReservations,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, history: nextHistory, reservations: nextReservations })
-              }
+              stats: calculateStatsFromState({ ...state, history: nextHistory, reservations: nextReservations })
             };
           });
         }
@@ -963,10 +1018,7 @@ export const useInvoiceStore = create<InvoiceState>()(
             });
             return {
               history: nextHistory,
-              stats: {
-                ...state.stats,
-                summary: calculateStatsFromState({ ...state, history: nextHistory })
-              }
+              stats: calculateStatsFromState({ ...state, history: nextHistory })
             };
           });
         }
@@ -988,13 +1040,10 @@ export const useInvoiceStore = create<InvoiceState>()(
         } else {
           // Preview/Browser Fallback - Calculate from local history
           const { history, guests, reservations } = get();
-          const summary = calculateStatsFromState({ history, guests, reservations });
+          const statsComputed = calculateStatsFromState({ history, guests, reservations });
 
           set((state) => ({ 
-            stats: { 
-              ...state.stats,
-              summary
-            } 
+            stats: statsComputed 
           }));
         }
       }

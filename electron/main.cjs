@@ -305,14 +305,44 @@ var paymentsApi = {
 var statsApi = {
   getMonthlyRevenue: () => {
     return db.prepare(`
+      WITH RevenueRecords AS (
+        SELECT 
+          strftime('%Y-%m', p.payment_date) as month,
+          p.amount as revenue,
+          p.invoice_id
+        FROM payments p
+        JOIN invoices i ON p.invoice_id = i.id
+        JOIN reservations r ON i.reservation_id = r.id
+        WHERE LOWER(r.status) != 'cancelled'
+        
+        UNION ALL
+        
+        SELECT 
+          strftime('%Y-%m', i.created_at) as month,
+          i.total_amount as revenue,
+          i.id as invoice_id
+        FROM invoices i
+        JOIN reservations r ON i.reservation_id = r.id
+        WHERE LOWER(i.status) = 'paid' AND LOWER(r.status) != 'cancelled'
+        AND i.id NOT IN (SELECT invoice_id FROM payments)
+        
+        UNION ALL
+        
+        SELECT 
+          strftime('%Y-%m', r.check_in) as month,
+          ((MAX(0, (r.nightly_rate * MAX(1, CAST(julianday(r.check_out) - julianday(r.check_in) AS INTEGER)) + r.cleaning_fee + r.service_fee) - r.discount)) * (1 + r.tax_rate / 100)) as revenue,
+          NULL as invoice_id
+        FROM reservations r
+        WHERE LOWER(r.status) != 'cancelled' 
+          AND LOWER(r.payment_status) = 'paid'
+          AND r.id NOT IN (SELECT reservation_id FROM invoices WHERE reservation_id IS NOT NULL)
+      )
       SELECT 
-        strftime('%Y-%m', p.payment_date) as month,
-        COALESCE(SUM(p.amount), 0) as revenue,
-        COUNT(DISTINCT p.invoice_id) as invoice_count
-      FROM payments p
-      JOIN invoices i ON p.invoice_id = i.id
-      JOIN reservations r ON i.reservation_id = r.id
-      WHERE LOWER(r.status) != 'cancelled'
+        month,
+        SUM(revenue) as revenue,
+        COUNT(DISTINCT invoice_id) as invoice_count
+      FROM RevenueRecords
+      WHERE month IS NOT NULL
       GROUP BY month
       ORDER BY month DESC
       LIMIT 12
@@ -320,16 +350,31 @@ var statsApi = {
   },
   getUnitRevenue: () => {
     return db.prepare(`
+      WITH RevenueRecords AS (
+        SELECT r.unit_name, p.amount as revenue, r.id as r_id
+        FROM payments p
+        JOIN invoices i ON p.invoice_id = i.id
+        JOIN reservations r ON i.reservation_id = r.id
+        WHERE LOWER(r.status) != 'cancelled'
+        UNION ALL
+        SELECT r.unit_name, i.total_amount as revenue, r.id as r_id
+        FROM invoices i
+        JOIN reservations r ON i.reservation_id = r.id
+        WHERE LOWER(i.status) = 'paid' AND LOWER(r.status) != 'cancelled'
+        AND i.id NOT IN (SELECT invoice_id FROM payments)
+        UNION ALL
+        SELECT r.unit_name, ((MAX(0, (r.nightly_rate * MAX(1, CAST(julianday(r.check_out) - julianday(r.check_in) AS INTEGER)) + r.cleaning_fee + r.service_fee) - r.discount)) * (1 + r.tax_rate / 100)) as revenue, r.id as r_id
+        FROM reservations r
+        WHERE LOWER(r.status) != 'cancelled' AND LOWER(r.payment_status) = 'paid' AND r.id NOT IN (SELECT reservation_id FROM invoices WHERE reservation_id IS NOT NULL)
+      )
       SELECT 
         r.unit_name,
-        COALESCE(SUM(p.amount), 0) as revenue,
+        COALESCE((SELECT SUM(revenue) FROM RevenueRecords rev WHERE rev.unit_name IS r.unit_name), 0) as revenue,
         COALESCE(SUM(
           (MAX(0, (r.nightly_rate * MAX(1, CAST(julianday(r.check_out) - julianday(r.check_in) AS INTEGER)) + r.cleaning_fee + r.service_fee) - r.discount)) * (1 + r.tax_rate / 100)
         ), 0) as potential_revenue,
         COUNT(r.id) as booking_count
       FROM reservations r
-      LEFT JOIN invoices i ON i.reservation_id = r.id
-      LEFT JOIN payments p ON p.invoice_id = i.id
       WHERE LOWER(r.status) != 'cancelled'
       GROUP BY r.unit_name
       ORDER BY revenue DESC
@@ -337,11 +382,27 @@ var statsApi = {
   },
   getStatsSummary: () => {
     const totalRevenue = db.prepare(`
-      SELECT SUM(p.amount) as total 
-      FROM payments p
-      JOIN invoices i ON p.invoice_id = i.id
-      JOIN reservations r ON i.reservation_id = r.id
-      WHERE LOWER(r.status) != 'cancelled'
+      SELECT 
+        (SELECT COALESCE(SUM(p.amount), 0) 
+         FROM payments p 
+         JOIN invoices i ON p.invoice_id = i.id 
+         JOIN reservations r ON i.reservation_id = r.id 
+         WHERE LOWER(r.status) != 'cancelled') +
+         
+        (SELECT COALESCE(SUM(i.total_amount), 0)
+         FROM invoices i
+         JOIN reservations r ON i.reservation_id = r.id
+         WHERE LOWER(i.status) = 'paid' AND LOWER(r.status) != 'cancelled'
+         AND i.id NOT IN (SELECT invoice_id FROM payments)) +
+         
+        (SELECT COALESCE(SUM(
+          (MAX(0, (nightly_rate * MAX(1, CAST(julianday(check_out) - julianday(check_in) AS INTEGER)) + cleaning_fee + service_fee) - discount)) * (1 + tax_rate / 100)
+         ), 0)
+         FROM reservations r
+         WHERE LOWER(r.status) != 'cancelled' 
+           AND LOWER(r.payment_status) = 'paid'
+           AND r.id NOT IN (SELECT reservation_id FROM invoices WHERE reservation_id IS NOT NULL))
+      as total
     `).get();
     const invoicedUnpaid = db.prepare(`
       SELECT SUM(i.total_amount) as total 
